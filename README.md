@@ -34,7 +34,7 @@ pip install -r requirements.txt
 Start the Streamlit application with:
 
 ```bash
-streamlit run fine_tuning_app.py
+streamlit run app.py
 ```
 
 This will open the application in your default web browser.
