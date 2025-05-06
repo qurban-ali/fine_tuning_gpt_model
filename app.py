@@ -7,6 +7,58 @@ from dotenv import load_dotenv
 # Load environment variables (for default values)
 load_dotenv()
 
+def create_fine_tuning_job(client, file_path: str, model_name: str):
+    """
+    Creates a fine-tuning job using the specified file and model.
+    
+    Args:
+        client: OpenAI client instance
+        file_path (str): Path to the training file
+        model_name (str): Name of the model to fine-tune
+        
+    Returns:
+        tuple: Contains uploaded file object and fine-tuning job object
+    """
+    # Upload the training file
+    uploaded_file = client.files.create(
+        file=open(file_path, "rb"),
+        purpose="fine-tune"
+    )
+
+    # Start fine-tuning job with the uploaded file ID
+    fine_tuning_jobs = client.fine_tuning.jobs.create(
+        training_file=uploaded_file.id,
+        model=model_name
+    )
+    
+    return uploaded_file, fine_tuning_jobs
+
+def retrieve_fine_tuning_job(client, job_id: str):
+    """
+    Retrieves the state of a fine-tuning job.
+    
+    Args:
+        client: OpenAI client instance
+        job_id (str): ID of the fine-tuning job to retrieve
+        
+    Returns:
+        object: Fine-tuning job details
+    """
+    return client.fine_tuning.jobs.retrieve(job_id)
+
+def cancel_fine_tuning_job(client, job_id: str):
+    """
+    Cancels a fine-tuning job.
+    
+    Args:
+        client: OpenAI client instance
+        job_id (str): ID of the fine-tuning job to cancel
+        
+    Returns:
+        object: Cancelled job details
+    """
+    return client.fine_tuning.jobs.cancel(job_id)
+
 # Page configuration
 st.set_page_config(page_title="OpenAI Fine-Tuning Manager", layout="wide")
 
@@ -83,44 +135,49 @@ if uploaded_file is not None:
 # Create fine-tuning job section
 if st.button("Start Fine-Tuning", disabled=client is None or uploaded_file is None):
     try:
-        with st.spinner("Uploading file and starting fine-tuning job..."):
-            # Save uploaded file to a temporary file
-            with tempfile.NamedTemporaryFile(delete=False, suffix=".jsonl") as tmp_file:
+        with st.spinner("Starting fine-tuning job..."):
+            # Create a temporary file with the uploaded content
+            with tempfile.NamedTemporaryFile(delete=False, suffix=".jsonl", mode='wb') as tmp_file:
                 tmp_file.write(uploaded_file.getvalue())
                 tmp_file_path = tmp_file.name
             
-            # Import the create_fine_tuning_job function from model.py
-            from model import create_fine_tuning_job
-            
-            # Create the fine-tuning job
-            uploaded_file_obj, fine_tuning_job = create_fine_tuning_job(
-                file_path=tmp_file_path,
-                model_name=selected_model
-            )
-            
-            # Clean up the temporary file
-            os.unlink(tmp_file_path)
-            
-            # Display job information
-            st.success(f"Fine-tuning job created successfully!")
-            st.json({
-                "job_id": fine_tuning_job.id,
-                "status": fine_tuning_job.status,
-                "model": fine_tuning_job.model,
-                "file_id": uploaded_file_obj.id
-            })
-            
-            # Store job ID in session state for later reference
-            if 'jobs' not in st.session_state:
-                st.session_state.jobs = []
-            
-            st.session_state.jobs.append({
-                "job_id": fine_tuning_job.id,
-                "status": fine_tuning_job.status,
-                "model": fine_tuning_job.model,
-                "created_at": fine_tuning_job.created_at
-            })
-            
+            try:
+                # Create fine-tuning job using local function
+                uploaded_file_obj, fine_tuning_job = create_fine_tuning_job(
+                    client=client,
+                    file_path=tmp_file_path,
+                    model_name=selected_model
+                )
+                
+                # Clear the file uploader state to prevent duplicate uploads
+                uploaded_file.close()
+                st.session_state.uploaded_file = None
+                
+                # Display job information
+                st.success(f"Fine-tuning job created successfully!")
+                st.json({
+                    "job_id": fine_tuning_job.id,
+                    "status": fine_tuning_job.status,
+                    "model": fine_tuning_job.model,
+                    "file_id": uploaded_file_obj.id
+                })
+                
+                # Store job ID in session state
+                if 'jobs' not in st.session_state:
+                    st.session_state.jobs = []
+                
+                st.session_state.jobs.append({
+                    "job_id": fine_tuning_job.id,
+                    "status": fine_tuning_job.status,
+                    "model": fine_tuning_job.model,
+                    "created_at": fine_tuning_job.created_at
+                })
+                
+            finally:
+                # Clean up the temporary file
+                if os.path.exists(tmp_file_path):
+                    os.unlink(tmp_file_path)
+                
     except Exception as e:
         st.error(f"Error creating fine-tuning job: {str(e)}")
 
@@ -138,11 +195,8 @@ job_id = st.text_input(
 if st.button("Check Job Status", disabled=client is None or not job_id):
     try:
         with st.spinner("Retrieving job status..."):
-            # Import the retrieve_fine_tuning_job function from model.py
-            from model import retrieve_fine_tuning_job
-            
-            # Retrieve job status
-            job = retrieve_fine_tuning_job(job_id)
+            # Retrieve job status using local function
+            job = retrieve_fine_tuning_job(client=client, job_id=job_id)
             
             # Display job information
             st.json({
@@ -158,11 +212,8 @@ if st.button("Check Job Status", disabled=client is None or not job_id):
 if st.button("Cancel Job", disabled=client is None or not job_id):
     try:
         with st.spinner("Cancelling job..."):
-            # Import the cancel_fine_tuning_job function from model.py
-            from model import cancel_fine_tuning_job
-            
-            # Cancel job
-            cancelled_job = cancel_fine_tuning_job(job_id)
+            # Cancel job using local function
+            cancelled_job = cancel_fine_tuning_job(client=client, job_id=job_id)
             
             # Display cancellation information
             st.success(f"Job {job_id} cancelled successfully!")
