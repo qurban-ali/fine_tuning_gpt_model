@@ -22,19 +22,24 @@ Make sure you have the following installed:
 
 ### Installation
 
-1. Clone or download this repository
-2. Install the required dependencies:
+Clone the repository and create an isolated Python environment:
 
 ```bash
-pip install -r requirements.txt
+git clone https://github.com/qurban-ali/fine_tuning_gpt_model.git
+cd fine_tuning_gpt_model
+python -m venv venv
+source venv/bin/activate
+python -m pip install -r requirements.txt
 ```
+
+On Windows PowerShell, activate with `venv\Scripts\Activate.ps1`.
 
 ### Running the Application
 
 Start the Streamlit application with:
 
 ```bash
-streamlit run app.py
+streamlit run app.py --server.address 127.0.0.1
 ```
 
 This will open the application in your default web browser.
@@ -60,7 +65,9 @@ Each line represents a single training example.
 ## Notes
 
 - Fine-tuning can take several hours depending on the size of your dataset and the model you choose
-- Your API key is not stored permanently, but only in the current session
+- The app reads `OPENAI_API_KEY` from the environment (including a local `.env` file) or accepts a key in a password field. Do not commit keys or share the local server with untrusted users.
+- The model selector is a fixed list in the application; availability depends on your OpenAI project and may change.
+- Uploading training data and creating jobs sends data to OpenAI and can incur charges. Use only data you are authorized to upload and remove unnecessary personal or confidential information.
 - Make sure your JSONL file is properly formatted to avoid errors
 
 ## Troubleshooting
